@@ -1,0 +1,172 @@
+<ItemConfirm>
+    on_release: 
+        root.set_icon(check)
+        app.on_choose_q(root.text)
+
+    CheckboxLeftWidget:
+        id: check
+        group: "check"
+        on_release : app.on_choose_q(root.text)
+
+
+MDBoxLayout:
+    orientation : "vertical"
+
+    MDTopAppBar:
+        title : "Yt Downloader App"
+        pos_hint : {"top":1}
+        left_action_items : [["menu",lambda x : nav_drawer.set_state('open')]]
+
+    MDNavigationLayout:
+        MDScreenManager:
+            id : screen_manager
+
+            MDScreen:
+                name : "home"
+
+                MDBoxLayout:
+                    id : main_box
+                    orientation : "vertical"
+                    padding : dp(16)
+                    spacing : dp(16)
+                    MDBoxLayout:
+                        spacing : dp(16)
+                        adaptive_height : True
+                        MDTextField:
+                            id : url
+                            hint_text : "Paste URL"
+                            mode : "round"
+                        
+                        MDFillRoundFlatIconButton:
+                            
+                            text : "Fetch"
+                            size_hint_x : 0.4
+                            icon : "magnify"
+                            on_release : app.on_fetch()
+                            #pos_hint : {"center_x":.5,"center_y":.5}
+                    
+                    MDSmartTile:
+                        id : thumb
+                        source: "test.png"
+                        allow_strech : True
+                        pos_hint: {"center_x": .5, "center_y": .5}
+                        #size_hint_y : 0.8
+
+                                
+                        MDLabel:
+                            id : thumbnail_title
+                            text: "Julia and Julie"
+                            bold: True
+
+                    MDBoxLayout:
+                        
+                        MDBoxLayout:
+                            orientation : "vertical"
+
+                            MDLabel:
+                                id : channel_name
+                                text : "Channel : "
+
+                            MDLabel:
+                                id : file_size
+                                text : "Size : "
+                            
+                            MDLabel:
+                                text : "Type : "
+
+                    MDBoxLayout:
+                        id: chip_box
+                        spacing: "4dp"
+                        adaptive_height : True
+
+
+                        MDBoxLayout:
+                            adaptive_height: True
+                            MDIconButton:
+                                id : v
+                                icon : "circle-outline"
+                                icon_size : dp(16)
+                                on_release : app.choose_cat("v","a","b")
+
+                            MDLabel:
+                                text : "V"
+
+                            MDIconButton:
+                                id : a
+                                icon : "circle-outline"
+                                icon_size : dp(16)
+                                on_release : app.choose_cat("a","v","b")
+
+
+                            MDLabel:
+                                text : "A"
+
+                            MDIconButton:
+                                id : b
+                                icon : "circle-outline"
+                                icon_size : dp(16)
+                                on_release : app.choose_cat("b","v","a")
+
+                            MDLabel:
+                                text : "B"
+                        
+
+                            MDRoundFlatIconButton:
+                                id : qual
+                                text: "Quality"
+                                icon: "multimedia"
+                                on_release : app.show_quality_selection()
+                    
+                    MDBoxLayout:
+
+                        spacing : dp(18)
+                        MDRoundFlatIconButton:
+                            text: "Choose Dir"
+                            icon: "folder"
+                            on_release : app.thread_calls("choose_dir")
+
+                        MDRoundFlatIconButton:
+                            text: "Download"
+                            icon: "download"
+                            on_release : app.thread_calls("download")
+                        
+                    MDProgressBar:
+                        id : progress
+                        size_hint_y : None
+                        height : dp(8)
+                        value: 0
+                                
+                
+                    Widget :
+                        size_hint_y : 1
+
+            MDScreen:
+                name : "about"
+            
+        MDNavigationDrawer:
+            id : nav_drawer
+
+            MDScrollView:
+                MDList:
+                    OneLineIconListItem:
+                        text : "Home"
+
+                        on_press :
+                            screen_manager.current = "home"
+                            nav_drawer.set_state('close')
+
+                        IconLeftWidget:
+                            icon : "home"
+
+                    OneLineIconListItem:
+                        text : "About"
+
+                        on_press :
+                            screen_manager.current = "about"
+                            nav_drawer.set_state('close')
+
+                        IconLeftWidget:
+                            icon : "information"
+                    
+
+
