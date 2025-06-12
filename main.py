@@ -125,14 +125,7 @@ MDBoxLayout:
                                 icon: "multimedia"
                                 on_release : app.show_quality_selection()
                                 
-
-                        
-
-
-
-
-
-                    
+                
                     Widget :
                         size_hint_y : 1
 
@@ -188,6 +181,7 @@ class Ytdownloader(MDApp):
         self.url = ""
         self.image_url = ""
         self.title = ""
+        self.selected_q = ""
         self.avail_resol = []
         self.playlist = False
         self.open_resol_dialog = False
@@ -271,11 +265,13 @@ class Ytdownloader(MDApp):
                     MDFlatButton(
                         text="CANCEL",
                         theme_text_color="Custom",
+                        on_release=self.close_d,
                         text_color=self.theme_cls.primary_color,
                     ),
                     MDFlatButton(
                         text="OK",
                         theme_text_color="Custom",
+                        on_release=self.close_d,
                         text_color=self.theme_cls.primary_color,
                     ),
                 ]
@@ -285,22 +281,12 @@ class Ytdownloader(MDApp):
             self.dialog.open()
 
     def on_choose_q(self,selected):
-        print(selected)
+        self.selected_q = selected
+    
+    def close_d(self,obj):
+        if self.dialog:
+            self.dialog.dismiss()
         
-
-            
-
-                
-
-
-
-
-
-
-
-    
-
-    
 
 
 
