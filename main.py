@@ -9,10 +9,42 @@ from kivy.clock import mainthread,Clock
 from kivymd.app import MDApp
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.button import MDFlatButton
+from kivy.uix.recycleboxlayout import RecycleBoxLayout
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.recycleview import MDRecycleView
+from kivy.uix.recycleview.views import RecycleDataViewBehavior
+from kivy.uix.behaviors import FocusBehavior
+from kivy.uix.recycleview.layout import LayoutSelectionBehavior
+from kivy.properties import StringProperty,BooleanProperty,ObjectProperty
 from kivymd.uix.list import OneLineAvatarIconListItem
 from plyer import filechooser
 
+class MDSelectableRecycleBoxLayout(FocusBehavior,
+                                   LayoutSelectionBehavior,
+                                   RecycleBoxLayout):
+    ''' Adds selection and focus behavior to the view. '''
+    pass
+class PlaylistItem(RecycleDataViewBehavior, MDBoxLayout):
+    title = StringProperty()
+    thumb = StringProperty()
+    url = StringProperty()
+    selected = BooleanProperty()
+    obj = ObjectProperty()
 
+    def refresh_view_attrs(self, rv, index, data):
+        self.index = index
+        return super().refresh_view_attrs(rv, index, data)
+
+    def on_touch_down(self, touch):
+        if super().on_touch_down(touch):
+            return True
+        if self.collide_point(*touch.pos):
+            self.parent.select_with_touch(self.index, touch)
+            return True
+        return False
+
+    def apply_selection(self, rv, index, is_selected):
+        self.selected = is_selected
 
 
 class NoneTypeQuality(Exception):
@@ -47,6 +79,7 @@ class Ytdownloader(MDApp):
         self.ext = ""
         self.avail_resol = []
         self.amount_completed = 0
+        self.i = 0
         self.cache = 0
         self.playlist = False
         self.open_resol_dialog = False
@@ -54,6 +87,7 @@ class Ytdownloader(MDApp):
         self.raised_d = False
         self.stream = None
         self.proceed_confirm = None
+        self.uni = None
 
     
     def build(self):
@@ -66,6 +100,7 @@ class Ytdownloader(MDApp):
         pass
     
     def on_fetch(self):
+        self.reset_state()
         self.url = self.root.ids.url.text
         print(self.url)
         threading.Thread(target=self.fetch_and_download,daemon=True).start()
@@ -120,6 +155,13 @@ class Ytdownloader(MDApp):
 
     def on_complete(self,ar1,ar2):
         self.root.ids.qual.disabled = False
+        self.amount_completed = 0
+        self.root.ids.progress.value = 0
+        @mainthread
+        def up():
+            self.amount_completed = 0
+            self.root.ids.progress.value = 0
+        up()
 
 
     def choose_cat(self,i,i1,i2):
@@ -171,8 +213,11 @@ class Ytdownloader(MDApp):
             strict='experimental' 
         ).run()
 
-        os.remove(os.path.join(self.path[0],video_path))
-        os.remove(os.path.join(self.path[0],audio_path))
+        self.root.ids.progress.value = 100
+        self.amount_completed = 100
+
+        os.remove(video_path)
+        os.remove(audio_path)
 
 
 
@@ -267,37 +312,55 @@ class Ytdownloader(MDApp):
 
 
     def start_download(self):
-        
-        Clock.schedule_interval(self.progress_bar,0.5)
-        threading.Thread(target=self.progress,daemon=True).start()
-        if self.yt == None:
-            self.yt = pf.YouTube(url=self.url,on_complete_callback=self.on_complete)
+        @mainthread
+        def reset_progress():
+            self.amount_completed = 0
+            self.root.ids.progress.value = 0
 
-        if self.selected_q == "":
-            
-            self.stream = self.yt.streams.get_highest_resolution()
-            self.file_size = self.stream.filesize_mb
+        reset_progress()
 
+        if self.yt is None:
+            self.yt = pf.YouTube(url=self.url, on_complete_callback=self.on_complete)
+
+        # Set default core and quality if not selected
         if self.selected_core == "":
             self.selected_core = "b"
 
-        
+        if self.selected_q == "":
+            self.stream = self.yt.streams.get_highest_resolution()
+        else:
+            self.stream = self.yt.streams.filter(resolution=self.selected_q).first()
 
-        if self.selected_core == "v":   
+        # Handle possible None stream
+        if self.stream is None:
+            self.warning_dialog_box("Failed to get stream for selected resolution").open()
+            return
+
+        self.file_size = self.stream.filesize_mb
+
+
+        Clock.schedule_interval(self.progress_bar, 0.5)
+        threading.Thread(target=self.progress, daemon=True).start()
+
+
+        if self.selected_core == "v":
             self.vid_downloader()
-            #self.stream.download(output_path=self.path[0])
         elif self.selected_core == "a":
             self.aud_downloader()
         elif self.selected_core == "b":
             self.both_downloader()
+
     
     def close_d(self,obj):
         if self.dialog:
             self.dialog.dismiss()
 
     def open_dir(self):
+        if self.uni:
+            self.uni.dismiss()
         self.path = filechooser.choose_dir()
         print(self.path)
+
 
     def thread_calls(self,called_by):
         if called_by == "download":
@@ -323,6 +386,28 @@ class Ytdownloader(MDApp):
             )
 
             return self.warn
+    def uni_dialog_box(self,warn_msg,title,func):
+            self.uni = MDDialog(
+                title=title,
+                text=warn_msg,
+                buttons=[
+                    MDFlatButton(
+                        text="Ok",
+                        theme_text_color="Custom",
+                        on_release=lambda x : func(),
+                        text_color=self.theme_cls.primary_color,
+                    ),
+                    MDFlatButton(
+                        text="Cancel",
+                        theme_text_color="Custom",
+                        on_release=lambda x : self.uni.dismiss(),
+                        text_color=self.theme_cls.primary_color,
+                    ),
+                ]
+
+            )
+
+            return self.uni
         
     def proceed_confirmations(self,msg):
             self.proceed_confirm = MDDialog(
@@ -348,16 +433,134 @@ class Ytdownloader(MDApp):
             return self.proceed_confirm
     
     def progress(self):
+        expected_path = os.path.join(self.path[0], self.stream.default_filename)
+        self.amount_completed = 0
         while not self.amount_completed > 98:
-            if os.path.exists(os.path.join(self.path[0],f"{self.yt.title}.{self.ext}")):
-                self.amount_completed = ((os.path.getsize(os.path.join(self.path[0],f"{self.yt.title}.{self.ext}"))/1048576)/self.file_size)*100
-                print(self.amount_completed)
-        self.root.ids.progress.value = 100
+            if os.path.exists(expected_path):
+                size = os.path.getsize(expected_path)
+                self.amount_completed = (size / (self.file_size * 1048576)) * 100
+                print(f"Progress: {self.amount_completed:.2f}%")
+            time.sleep(0.5)
+        @mainthread
+        def finish():
+            if not self.selected_core == "b":
+                self.root.ids.progress.value = 100
+                self.amount_completed = 100
+            else :
+                self.amount_completed = 90
+                self.root.ids.progress.value = 90
+        finish()
             
     def progress_bar(self,dt):
         self.root.ids.progress.value = self.amount_completed
 
-                
+    def reset_state(self):
+        self.yt = None
+        self.path = ""
+        self.stream = None
+        self.selected_q = ""
+        self.selected_core = ""
+        self.ext = ""
+        self.avail_resol = []
+        self.file_size = 0
+        self.amount_completed = 0
+        self.raised = False
+        self.raised_d = False
+        self.proceed_confirm = None
+        self.uni = None
+        self.root.ids.progress.value = 0
+        self.root.ids.file_size.text = ""
+        self.root.ids.thumb.source = ""
+        self.root.ids.thumbnail_title.text = ""
+        self.root.ids.channel_name.text = ""
+        self.yt_play = None
+        self.root.ids.play_download.disabled = True
+
+    def on_fetch_playlist(self):
+        self.reset_state()
+        self.url_play = self.root.ids.url_play.text
+        threading.Thread(target=self.on_f_p,daemon=True).start()
+
+    def on_f_p(self):
+        self.play_items = []
+        data_list = []
+        if self.yt_play == None:
+            self.yt_play = pf.Playlist(url=self.url_play)
+
+        count = 0
+        
+        for video in self.yt_play.videos:
+            if video == None:
+                break
+            title = video.title
+            thumb_url = video.thumbnail_url
+            video = video.streams.get_highest_resolution(progressive=True)
+
+
+            response = r.get(thumb_url)
+
+            with open(os.path.join(self.path,f'tmp/{video.default_filename}.png'),"wb") as f:
+                for chunk in response:
+
+                    if chunk:
+                        f.write(chunk)
+            timeout = 5  # seconds
+            elapsed = 0
+            while not os.path.exists(os.path.join(self.path,f'tmp/{video.default_filename}.png')) and elapsed < timeout:
+                time.sleep(0.1)
+                elapsed += 0.1
+
+            if timeout>5 and not os.path.join(self.path,f'tmp/{video.default_filename}.png'):
+                image = os.path.join(self.path,f'tmp/blank.png')
+            else : image = os.path.join(self.path,f'tmp/{video.default_filename}.png')
+
+            data_list.append({
+                "title": title,
+                "thumb": image,
+                "selected": False,
+                "index": count,
+                "url": video.url,
+                "obj": video
+            })
+
+            count += 1
+
+            @mainthread
+            def update_rv():
+                self.root.ids.play_list.data = data_list
+
+            update_rv()
+        self.root.ids.play_download.disabled = False
+
+    def set_selected(self, index, value):
+        self.root.ids.play_list.data[index]["selected"] = value
+
+    def on_playlist_download(self):
+
+        selected_nodes = self.root.ids.play_list.children[0].selected_nodes
+
+        for i in selected_nodes:
+            print(self.root.ids.play_list.data[i]["url"])
+
+        if self.path == "":
+            self.uni_dialog_box("Choose a Dir","Select Dir",self.open_dir).open()
+        if not self.path == "":
+            threading.Thread(target=self._download_playlist,args=(selected_nodes,),daemon=True).start()
+        
+
+        
+    def _download_playlist(self,nodes):
+
+        if len(nodes) < 1 : print("Nothing")
+        for node in nodes:
+            video = self.root.ids.play_list.data[node]["obj"]
+
+            video.download(output_path=self.path[0])
+
+            print(f"Download of {video} Completed")
+
+            
+
 
 
 
