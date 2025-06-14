@@ -96,7 +96,12 @@ Ensure write permissions for this directory.
 ```bash
 python main.py
 ```
-
+---
+## Updates
+- **Linux Support** - Current Version is stable on linux and nothing is broken more features yet to come.
+- **Android Support** – Added android support but, Downloading both (aud+video) is broken. yet to fix.
+- **Limits** - Playlist download limited to high res of progressive (not Full Quality).
+- **More** - More Options are yet to come for playlist downloading.
 ---
 
 ## 📧 Contact
