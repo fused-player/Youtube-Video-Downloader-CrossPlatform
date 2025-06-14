@@ -1,15 +1,18 @@
 import os
 import time
-import ffmpeg
 import random
 import string
+import ssl
 import requests as r
 import threading
 import pytubefix as pf
+from jnius import autoclass
 from kivy.lang import Builder
 from kivy.clock import mainthread,Clock
 from kivymd.app import MDApp
+from kivy import platform
 from kivymd.uix.dialog import MDDialog
+from kivymd.uix.filemanager import MDFileManager
 from kivymd.uix.button import MDFlatButton
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -18,7 +21,24 @@ from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.recycleview.layout import LayoutSelectionBehavior
 from kivy.properties import StringProperty,BooleanProperty,ObjectProperty
 from kivymd.uix.list import OneLineAvatarIconListItem
-from plyer import filechooser
+
+
+if platform == "android":
+    from android.storage import primary_external_storage_path,app_storage_path
+    from android.permissions import request_permissions, Permission, check_permission  # pylint: disable=import-error # type: ignore
+    request_permissions([Permission.READ_EXTERNAL_STORAGE,
+                        Permission.WRITE_EXTERNAL_STORAGE])
+    
+    
+    ssl._create_default_https_context = ssl._create_stdlib_context
+
+    main_path = primary_external_storage_path()
+
+    app_dir = app_storage_path()
+else :
+    import ffmpeg
+    from plyer import filechooser
+
 
 class MDSelectableRecycleBoxLayout(FocusBehavior,
                                    LayoutSelectionBehavior,
@@ -90,6 +110,21 @@ class Ytdownloader(MDApp):
         self.stream = None
         self.proceed_confirm = None
         self.uni = None
+        self.tmp_dir = ""
+
+        self.file_manager_obj = MDFileManager(
+            select_path = self.select_path,
+            exit_manager = self.exit_manager,
+            preview = False
+        )
+    
+    def select_path(self,current_path):
+        print(current_path)
+        self.path = [current_path]
+        self.file_manager_obj.close()
+    
+    def exit_manager(self):
+        self.file_manager_obj.close()
 
     
     def build(self):
@@ -98,8 +133,23 @@ class Ytdownloader(MDApp):
         return Builder.load_file('ui.kv')
     
     def on_start(self):
-        #self.warning_dialog_box("Error test").open()
-        pass
+        if platform == "android":
+            if not self.check_manage_external_storage():
+                self.check_manage_external_storage()
+                self.warning_dialog_box("Please grant All Files Access permission.").open()
+            os.makedirs(os.path.join(app_dir,'tmp/'), exist_ok=True)
+            self.tmp_dir = os.path.join(app_dir,"tmp/")
+
+    def sanitize_filename(self, filename):
+        # Remove invalid characters for Android
+        invalid_chars = ['?', '|', '<', '>', ':', '"', '/', '\\', '*']
+        for char in invalid_chars:
+            filename = filename.replace(char, '')
+        # Remove trailing spaces and dots
+        filename = filename.strip('. ')
+        return filename
+
+
     
     def on_fetch(self):
         self.reset_state()
@@ -139,7 +189,10 @@ class Ytdownloader(MDApp):
 
                 response = r.get(url=self.image_url)
                 timestamp = int(time.time())
-                img_path = f"tmp/thumb_{timestamp}.png"
+                if platform == "android":
+                    img_path = os.path.join(self.tmp_dir,f"thumb_{timestamp}.png")
+                else :
+                    img_path = f"thumb_{timestamp}.png"
 
                 with open(img_path,"ab") as f:
                     for chunk in response.iter_content():
@@ -187,44 +240,67 @@ class Ytdownloader(MDApp):
 
     def vid_downloader(self):
         self.ext = "mp4"
-        self.stream.download(output_path=self.path[0])
+        safe_title = self.sanitize_filename(self.yt.title)
+        filename = f"{safe_title}.mp4"
+        self.stream.download(output_path=self.path[0],filename=filename)
 
     def aud_downloader(self):
         self.ext = "m4a"
         self.stream = self.yt.streams.get_audio_only()
-        self.stream.download(output_path=self.path[0])
+        safe_title = self.sanitize_filename(self.yt.title)
+        filename = f"{safe_title}.m4a"
+        self.stream.download(output_path=self.path[0],filename=filename)
 
     def both_downloader(self):
-        self.ext = "mp4"
-        self.stream.download(output_path=self.path[0])
 
-        self.stream = self.yt.streams.get_audio_only()
-        self.stream.download(output_path=self.path[0])
+        if platform == "android":
+            safe_title = self.sanitize_filename(self.yt.title)
+            self.stream = self.yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
 
-        video_path = os.path.join(self.path[0], f"{self.yt.title}.mp4")
-        audio_path = os.path.join(self.path[0], f"{self.yt.title}.m4a")
-        output_path = os.path.join(self.path[0], f"{self.yt.title}_merged.mp4")
 
-        video_input = ffmpeg.input(video_path)
-        audio_input = ffmpeg.input(audio_path)
+            self.stream.download(output_path=os.path.join(self.path[0], f"{safe_title}.mp4"))
 
-        # Output (merge)
-        ffmpeg.output(
-            video_input,       
-            audio_input,
-            output_path,
-            vcodec='copy',
-            acodec='aac',
-            progress = "prog.txt",
-            loglevel = "info",
-            strict='experimental' 
-        ).run()
+        else :
+
+            safe_title = self.sanitize_filename(self.yt.title)
+            filename = f"{safe_title}.mp4"
+            self.ext = "mp4"
+            self.stream.download(output_path=self.path[0],filename=filename)
+
+            self.stream = self.yt.streams.get_audio_only()
+
+            safe_title = self.sanitize_filename(self.yt.title)
+            filename = f"{safe_title}.m4a"
+
+            self.stream.download(output_path=self.path[0],filename=filename)
+
+            video_path = os.path.join(self.path[0], f"{safe_title}.mp4")
+            audio_path = os.path.join(self.path[0], f"{safe_title}.m4a")
+            output_path = os.path.join(self.path[0], f"{safe_title}_merged.mp4")
+
+        
+            video_input = ffmpeg.input(video_path)
+            audio_input = ffmpeg.input(audio_path)
+
+                # Output (merge)
+            ffmpeg.output(
+                    video_input,       
+                    audio_input,
+                    output_path,
+                    vcodec='copy',
+                    acodec='aac',
+                    progress = "prog.txt",
+                    loglevel = "info",
+                    strict='experimental' 
+            ).run()
+
+            os.remove(video_path)
+            os.remove(audio_path)
 
         self.root.ids.progress.value = 100
         self.amount_completed = 100
 
-        os.remove(video_path)
-        os.remove(audio_path)
+
 
 
 
@@ -319,46 +395,57 @@ class Ytdownloader(MDApp):
 
 
     def start_download(self):
+
+        if platform == "android":
+            Environment = autoclass('android.os.Environment')
+            if Environment.isExternalStorageManager():
+                print("All files access granted")
+            else:
+                print("Not granted")
+
         @mainthread
         def reset_progress():
             self.amount_completed = 0
             self.root.ids.progress.value = 0
 
         reset_progress()
-        self.root.ids.main_fetch.disabled = True
+        try:
+            self.root.ids.main_fetch.disabled = True
 
-        if self.yt is None:
-            self.yt = pf.YouTube(url=self.url, on_complete_callback=self.on_complete)
+            if self.yt is None:
+                self.yt = pf.YouTube(url=self.url, on_complete_callback=self.on_complete)
 
-        # Set default core and quality if not selected
-        if self.selected_core == "":
-            self.selected_core = "b"
+            # Set default core and quality if not selected
+            if self.selected_core == "":
+                self.selected_core = "b"
 
-        if self.selected_q == "":
-            self.stream = self.yt.streams.get_highest_resolution()
-        else:
-            self.stream = self.yt.streams.filter(resolution=self.selected_q).first()
+            if self.selected_q == "":
+                self.stream = self.yt.streams.get_highest_resolution()
+            else:
+                self.stream = self.yt.streams.filter(resolution=self.selected_q).first()
 
-        # Handle possible None stream
-        if self.stream is None:
-            self.warning_dialog_box("Failed to get stream for selected resolution").open()
-            return
+            # Handle possible None stream
+            if self.stream is None:
+                self.warning_dialog_box("Failed to get stream for selected resolution").open()
+                return
 
-        self.file_size = self.stream.filesize_mb
-
-
-        Clock.schedule_interval(self.progress_bar, 0.5)
-        threading.Thread(target=self.progress, daemon=True).start()
+            self.file_size = self.stream.filesize_mb
 
 
-        if self.selected_core == "v":
-            self.vid_downloader()
-        elif self.selected_core == "a":
-            self.aud_downloader()
-        elif self.selected_core == "b":
-            self.both_downloader()
-        
-        self.root.ids.main_fetch.disabled = False
+            Clock.schedule_interval(self.progress_bar, 0.5)
+            threading.Thread(target=self.progress, daemon=True).start()
+
+
+            if self.selected_core == "v":
+                self.vid_downloader()
+            elif self.selected_core == "a":
+                self.aud_downloader()
+            elif self.selected_core == "b":
+                self.both_downloader()
+            
+            self.root.ids.main_fetch.disabled = False
+
+        except : self.root.ids.main_fetch.disabled = False
 
     
     def close_d(self,obj):
@@ -368,7 +455,15 @@ class Ytdownloader(MDApp):
     def open_dir(self):
         if self.uni:
             self.uni.dismiss()
-        self.path = filechooser.choose_dir()
+
+        if platform == "android":
+            @mainthread
+            def filem():
+                self.file_manager_obj.show(main_path)
+            filem()
+        else :
+        
+            self.path = filechooser.choose_dir()
         print(self.path)
 
 
@@ -443,7 +538,7 @@ class Ytdownloader(MDApp):
             return self.proceed_confirm
     
     def progress(self):
-        expected_path = os.path.join(self.path[0], self.stream.default_filename)
+        expected_path = os.path.join(self.path[0], self.sanitize_filename(self.stream.default_filename))
         self.amount_completed = 0
         while not self.amount_completed > 98:
             if os.path.exists(expected_path):
@@ -516,21 +611,28 @@ class Ytdownloader(MDApp):
 
 
             response = r.get(thumb_url)
+            if platform == "android":
+                c_path = os.path.join(self.tmp_dir,f'{r_string}.png')
+            else : 
+                c_path = os.path.join(self.path,f'tmp/{r_string}.png')
 
-            with open(os.path.join(self.path,f'tmp/{r_string}.png'),"wb") as f:
+            with open(c_path,"wb") as f:
                 for chunk in response:
 
                     if chunk:
                         f.write(chunk)
             timeout = 5  # seconds
             elapsed = 0
-            while not os.path.exists(os.path.join(self.path,f'tmp/{r_string}.png')) and elapsed < timeout:
+            while not os.path.exists(c_path) and elapsed < timeout:
                 time.sleep(0.1)
                 elapsed += 0.1
 
-            if timeout>5 and not os.path.join(self.path,f'tmp/{r_string}.png'):
-                image = os.path.join(self.path,f'tmp/blank.png')
-            else : image = os.path.join(self.path,f'tmp/{r_string}.png')
+            if timeout>5 and not c_path:
+                if platform == "android":
+                    image = os.path.join(self.path,f'tmp/blank.png')
+                else :
+                    image = 'test.png'
+            else : image = c_path
 
             data_list.append({
                 "title": title,
@@ -605,6 +707,26 @@ class Ytdownloader(MDApp):
         random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
         return random_string
+    
+    def check_manage_external_storage(self):
+        Environment = autoclass('android.os.Environment')
+        Settings = autoclass('android.provider.Settings')
+        Intent = autoclass('android.content.Intent')
+        Uri = autoclass('android.net.Uri')
+        VERSION = autoclass('android.os.Build$VERSION')
+        PythonActivity = autoclass('org.kivy.android.PythonActivity')
+
+        if VERSION.SDK_INT >= 30:
+            if not Environment.isExternalStorageManager():
+                intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                uri = Uri.fromParts("package", PythonActivity.mActivity.getPackageName(), None)
+                intent.setData(uri)
+                PythonActivity.mActivity.startActivity(intent)
+                return False
+            else:
+                return True
+        else:
+            return True
             
 
 
