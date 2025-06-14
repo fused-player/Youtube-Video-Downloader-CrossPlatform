@@ -67,7 +67,6 @@ MDBoxLayout:
                             mode : "round"
                         
                         MDFillRoundFlatIconButton:
-                            
                             text : "Fetch"
                             size_hint_x : 0.4
                             icon : "magnify"
@@ -155,6 +154,7 @@ MDBoxLayout:
                             on_release : app.thread_calls("choose_dir")
 
                         MDRoundFlatIconButton:
+                            id : main_fetch
                             text: "Download"
                             icon: "download"
                             on_release : app.thread_calls("download")
@@ -185,22 +185,32 @@ MDBoxLayout:
                             mode : "round"
                         
                         MDFillRoundFlatIconButton:
-                            
+                            id : play_fetch
                             text : "Fetch"
                             size_hint_x : 0.4
                             icon : "magnify"
                             on_release : app.on_fetch_playlist()
                             #pos_hint : {"center_x":.5,"center_y":.5}
+
+                    MDBoxLayout:
+                        adaptive_height : True
+                        spacing : dp(16)
                         
-                    MDFillRoundFlatIconButton:
-                        id : play_download
-                        text : "download"
-                        icon : "magnify"
-                        disabled : True
+                        MDFillRoundFlatIconButton:
+                            id : play_download
+                            text : "download"
+                            icon : "magnify"
+                            disabled : True
+                            
+                            on_release : app.on_playlist_download()
+                            #pos_hint : {"center_x":.5,"center_y":.5}
                         
-                        on_release : app.on_playlist_download()
-                        pos_hint : {"center_x":.5,"center_y":.5}
-                
+                        MDLabel:
+                            id : downloaded
+
+                            text : "Downloaded :  0/0"
+                        
+                    
 
 
                     MDRecycleView:

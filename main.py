@@ -1,6 +1,8 @@
 import os
 import time
 import ffmpeg
+import random
+import string
 import requests as r
 import threading
 import pytubefix as pf
@@ -11,7 +13,6 @@ from kivymd.uix.dialog import MDDialog
 from kivymd.uix.button import MDFlatButton
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.recycleview import MDRecycleView
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.recycleview.layout import LayoutSelectionBehavior
@@ -79,6 +80,7 @@ class Ytdownloader(MDApp):
         self.ext = ""
         self.avail_resol = []
         self.amount_completed = 0
+        self.finished_videos = 0
         self.i = 0
         self.cache = 0
         self.playlist = False
@@ -112,8 +114,13 @@ class Ytdownloader(MDApp):
         try :
             if "playlist" in self.url:
                 self.playlist = True
+                @mainthread
+                def open_warn():
+                    self.warning_dialog_box("Go to Playlist Scetion to Download").open()
+                open_warn()
+                self.playlist = False
 
-            if not self.playlist:
+            if not "playlist" in self.url:
                 self.yt = pf.YouTube(url=self.url,on_complete_callback=self.on_complete)
                 self.title = self.yt.title
                 self.root.ids.thumbnail_title.text = self.title
@@ -318,6 +325,7 @@ class Ytdownloader(MDApp):
             self.root.ids.progress.value = 0
 
         reset_progress()
+        self.root.ids.main_fetch.disabled = True
 
         if self.yt is None:
             self.yt = pf.YouTube(url=self.url, on_complete_callback=self.on_complete)
@@ -349,6 +357,8 @@ class Ytdownloader(MDApp):
             self.aud_downloader()
         elif self.selected_core == "b":
             self.both_downloader()
+        
+        self.root.ids.main_fetch.disabled = False
 
     
     def close_d(self,obj):
@@ -464,6 +474,7 @@ class Ytdownloader(MDApp):
         self.avail_resol = []
         self.file_size = 0
         self.amount_completed = 0
+        self.finished_videos = 0
         self.raised = False
         self.raised_d = False
         self.proceed_confirm = None
@@ -478,8 +489,14 @@ class Ytdownloader(MDApp):
 
     def on_fetch_playlist(self):
         self.reset_state()
-        self.url_play = self.root.ids.url_play.text
-        threading.Thread(target=self.on_f_p,daemon=True).start()
+        if "playlist" in self.root.ids.url_play.text:
+            self.root.ids.play_fetch.disabled = True
+            self.url_play = self.root.ids.url_play.text
+            threading.Thread(target=self.on_f_p,daemon=True).start()
+        else :
+            def open_warn():
+                self.warning_dialog_box("Go to Home to Download a Single Video").open()
+            open_warn()
 
     def on_f_p(self):
         self.play_items = []
@@ -493,26 +510,27 @@ class Ytdownloader(MDApp):
             if video == None:
                 break
             title = video.title
+            r_string = self.random_string()
             thumb_url = video.thumbnail_url
             video = video.streams.get_highest_resolution(progressive=True)
 
 
             response = r.get(thumb_url)
 
-            with open(os.path.join(self.path,f'tmp/{video.default_filename}.png'),"wb") as f:
+            with open(os.path.join(self.path,f'tmp/{r_string}.png'),"wb") as f:
                 for chunk in response:
 
                     if chunk:
                         f.write(chunk)
             timeout = 5  # seconds
             elapsed = 0
-            while not os.path.exists(os.path.join(self.path,f'tmp/{video.default_filename}.png')) and elapsed < timeout:
+            while not os.path.exists(os.path.join(self.path,f'tmp/{r_string}.png')) and elapsed < timeout:
                 time.sleep(0.1)
                 elapsed += 0.1
 
-            if timeout>5 and not os.path.join(self.path,f'tmp/{video.default_filename}.png'):
+            if timeout>5 and not os.path.join(self.path,f'tmp/{r_string}.png'):
                 image = os.path.join(self.path,f'tmp/blank.png')
-            else : image = os.path.join(self.path,f'tmp/{video.default_filename}.png')
+            else : image = os.path.join(self.path,f'tmp/{r_string}.png')
 
             data_list.append({
                 "title": title,
@@ -530,6 +548,7 @@ class Ytdownloader(MDApp):
                 self.root.ids.play_list.data = data_list
 
             update_rv()
+        self.root.ids.play_fetch.disabled = False
         self.root.ids.play_download.disabled = False
 
     def set_selected(self, index, value):
@@ -551,14 +570,41 @@ class Ytdownloader(MDApp):
         
     def _download_playlist(self,nodes):
 
+        
+        self.root.ids.play_download.disabled = True
         if len(nodes) < 1 : print("Nothing")
-        for node in nodes:
+        self.selected_videos = nodes
+        Clock.schedule_interval(self.update_playlist_ui,0.5)
+        for i,node in enumerate(nodes):
             video = self.root.ids.play_list.data[node]["obj"]
+
+            
 
             video.download(output_path=self.path[0])
 
             print(f"Download of {video} Completed")
+            self.finished_videos = i + 1
+        
+        def complete():
+            print("COmplete")
+            self.root.ids.play_list.children[0].selected_nodes = []
+            self.root.ids.play_download.disabled = False
+        threading.Thread(target=complete,daemon=True).start()
 
+        
+
+    def update_playlist_ui(self,dt):
+        self.root.ids.downloaded.text = f"Downloaded : {self.finished_videos}/{len(self.selected_videos)}"
+
+        if len(self.selected_videos) < self.finished_videos:
+            self.finished_videos = 0
+            Clock.unschedule(self.update_playlist_ui,0.1)
+            
+    def random_string(self):
+        length = 8
+        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+
+        return random_string
             
 
 
