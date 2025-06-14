@@ -99,23 +99,6 @@ python main.py
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! To contribute:
-
-1. Fork this repository
-2. Create a new branch  
-   `git checkout -b feature/your-feature-name`
-3. Make changes and commit  
-   `git commit -m "Add your message"`
-4. Push the branch  
-   `git push origin feature/your-feature-name`
-5. Open a Pull Request
-
-Suggestions and improvements for UI, playlist options, and bug fixes are appreciated.
-
----
-
 ## 📧 Contact
 
 For questions or feedback, please open an issue in the GitHub repository.
