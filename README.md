@@ -7,11 +7,11 @@ This project provides a simple yet powerful application for downloading YouTube 
 
 Built with **Kivy/KivyMD** for a consistent UI and **PytubeFix** for reliable downloads, this app makes saving your favorite YouTube content easy and accessible.
 
-**Note:** This is a prototype under active development. Core download features are working, but the UI and certain functionalities are still being refined.
+**Note:** This app is under development.
 
 ---
 
-## 🛠️ Current Functionality (Prototype)
+## 🛠️ Current Functionality
 
 The application currently supports the following features:
 
@@ -62,7 +62,7 @@ Future support is planned for:
 
 ---
 
-## 🚀 Getting Started (Linux Prototype)
+## 🚀 Getting Started 
 
 ### 1. Clone the Repository
 
