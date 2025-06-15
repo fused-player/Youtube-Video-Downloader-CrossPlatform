@@ -33,10 +33,6 @@ The application currently supports the following features:
 
 ## 🚧 Work in Progress / Known Limitations
 
-- **UI Download Indication**
-  - Single video download shows basic progress, but may not be real-time
-  - Playlist downloads have no visual download progress shown
-
 - **Playlist Download Options**
   - No option yet for selecting audio-only or combined video/audio for playlist items
   - All playlist videos download in default progressive `.mp4` format
@@ -47,8 +43,7 @@ The application currently supports the following features:
 
 Future support is planned for:
 
-- Android
-- Linux
+
 - Windows
 
 ---
@@ -86,10 +81,10 @@ pip install kivy kivymd pytubefix ffmpeg-python plyer
 
 
 
-### 4. Prepare Temporary Directory
+### 4. Prepare Directories
 
 The app uses a `tmp` folder in the selected download location to store thumbnails.  
-Ensure write permissions for this directory.
+**Note: ** `tmp` is not a temporary dir to delete.
 
 ### 5. Run the Application
 
@@ -97,9 +92,16 @@ Ensure write permissions for this directory.
 python main.py
 ```
 ---
-## Updates
-- **Linux Support** - Current Version is stable on linux and nothing is broken more features yet to come.
-- **Android Support** – Added android support but, Downloading both (aud+video) is broken. yet to fix.
+## <img src="https://img.icons8.com/color/96/android-os.png" width="28" style="position:relative; top:4px"/> Android
+
+
+
+- Go to [release](https://github.com/fused-player/Youtube-Video-Downloader-CrossPlatform/releases) section for download.
+
+---
+## Updates[15/06/25]
+- **Linux Support** - Current Version is stable on linux and more features yet to come.
+- **Android Support** – Currently stable . Added ffmpeg support.
 - **Limits** - Playlist download limited to high res of progressive (not Full Quality).
 - **More** - More Options are yet to come for playlist downloading.
 ---
