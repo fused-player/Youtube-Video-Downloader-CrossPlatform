@@ -231,6 +231,53 @@ MDBoxLayout:
 
             MDScreen:
                 name : "about"
+                MDBoxLayout:
+                    orientation: "vertical"
+                    padding: dp(20)
+                    spacing: dp(15)
+
+                    MDLabel:
+                        text: "📱 YouTube Video Downloader"
+                        font_style: "H5"
+                        halign: "center"
+                        theme_text_color: "Primary"
+
+                    MDLabel:
+                        text: "Version: 1.0"
+                        font_style: "Subtitle1"
+                        halign: "center"
+                        theme_text_color: "Secondary"
+
+                    MDSeparator:
+                        height: dp(1)
+
+                    MDLabel:
+                        text: "🔧 Developer: [b]fused-player[/b]"
+                        markup: True
+                        font_style: "Subtitle2"
+                        halign: "center"
+
+                    MDLabel:
+                        text: "💻 Cross-platform app to download YouTube videos and playlists with ease. Built using Python, KivyMD, and FFmpeg integration for Android merging."
+                        halign: "center"
+                        theme_text_color: "Hint"
+                        text_size: self.width * 0.95, None
+                        size_hint_y: None
+                        height: self.texture_size[1]
+
+                    MDLabel:
+                        text: "[ref=github][u][color=#1e88e5]🌐 GitHub Repository[/color][/u][/ref]"
+                        markup: True
+                        halign: "center"
+                        on_ref_press: app.open_link("https://github.com/fused-player/Youtube-Video-Downloader-CrossPlatform")
+
+
+                    Widget:
+
+                    MDRaisedButton:
+                        text: "Visit GitHub Profile"
+                        pos_hint: {"center_x": 0.5}
+                        on_release: app.open_link("https://github.com/fused-player")
             
         MDNavigationDrawer:
             id : nav_drawer
