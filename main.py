@@ -6,6 +6,7 @@ import ssl
 import subprocess
 import requests as r
 import threading
+import webbrowser
 import pytubefix as pf
 from jnius import autoclass
 from kivy.lang import Builder
@@ -732,6 +733,10 @@ class Ytdownloader(MDApp):
                 return True
         else:
             return True
+        
+
+    def open_link(self, url):
+        webbrowser.open(url)
             
 
 
