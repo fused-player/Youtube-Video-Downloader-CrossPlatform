@@ -3,6 +3,7 @@ import time
 import random
 import string
 import ssl
+import subprocess
 import requests as r
 import threading
 import pytubefix as pf
@@ -138,7 +139,9 @@ class Ytdownloader(MDApp):
                 self.check_manage_external_storage()
                 self.warning_dialog_box("Please grant All Files Access permission.").open()
             os.makedirs(os.path.join(app_dir,'tmp/'), exist_ok=True)
+            os.makedirs(os.path.join(app_dir,'assets/'), exist_ok=True)
             self.tmp_dir = os.path.join(app_dir,"tmp/")
+            self.ffmpeg_android = os.path.join(os.getcwd(),"assets/ffmpeg")
 
     def sanitize_filename(self, filename):
         # Remove invalid characters for Android
@@ -252,50 +255,50 @@ class Ytdownloader(MDApp):
         self.stream.download(output_path=self.path[0],filename=filename)
 
     def both_downloader(self):
-
-        if platform == "android":
-            safe_title = self.sanitize_filename(self.yt.title)
-            self.stream = self.yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-
-
-            self.stream.download(output_path=os.path.join(self.path[0], f"{safe_title}.mp4"))
-
-        else :
-
-            safe_title = self.sanitize_filename(self.yt.title)
-            filename = f"{safe_title}.mp4"
-            self.ext = "mp4"
-            self.stream.download(output_path=self.path[0],filename=filename)
-
-            self.stream = self.yt.streams.get_audio_only()
-
-            safe_title = self.sanitize_filename(self.yt.title)
-            filename = f"{safe_title}.m4a"
-
-            self.stream.download(output_path=self.path[0],filename=filename)
-
-            video_path = os.path.join(self.path[0], f"{safe_title}.mp4")
-            audio_path = os.path.join(self.path[0], f"{safe_title}.m4a")
-            output_path = os.path.join(self.path[0], f"{safe_title}_merged.mp4")
-
+        if self.stream is None:
+            self.stream = self.yt.streams.get_by_resolution(self.selected_q)
+    
+        safe_title = self.sanitize_filename(self.stream.title)
+        filename_video = f"{safe_title}.mp4"
         
-            video_input = ffmpeg.input(video_path)
-            audio_input = ffmpeg.input(audio_path)
+        self.stream.download(output_path=self.path[0], filename=filename_video)
 
-                # Output (merge)
+        self.stream = self.yt.streams.get_audio_only()
+
+        safe_title = self.sanitize_filename(self.stream.title)
+        filename_audio = f"{safe_title}.m4a"
+
+        self.stream.download(output_path=self.path[0], filename=filename_audio)
+
+
+        output_path = os.path.join(self.path[0], f"{safe_title}_merged.mp4")
+        
+        
+
+        video_path = os.path.join(self.path[0], filename_video)
+        audio_path = os.path.join(self.path[0], filename_audio)
+
+        # Merge
+        if platform == "android":
+            result = subprocess.run(
+                f'/system/bin/linker64 "{self.ffmpeg_android}" -i "{video_path}" -i "{audio_path}" -c:v copy -c:a aac -strict experimental -y "{output_path}"',
+                shell=True, capture_output=True, text=True
+            )
+            print("STDOUT:", result.stdout)
+            print("STDERR:", result.stderr)
+        else:
             ffmpeg.output(
-                    video_input,       
-                    audio_input,
-                    output_path,
-                    vcodec='copy',
-                    acodec='aac',
-                    progress = "prog.txt",
-                    loglevel = "info",
-                    strict='experimental' 
+                ffmpeg.input(video_path),
+                ffmpeg.input(audio_path),
+                output_path,
+                vcodec='copy', acodec='aac',
+                loglevel='info',
+                strict='experimental'
             ).run()
 
-            os.remove(video_path)
-            os.remove(audio_path)
+        # Clean up
+        os.remove(video_path)
+        os.remove(audio_path)
 
         self.root.ids.progress.value = 100
         self.amount_completed = 100
@@ -445,7 +448,9 @@ class Ytdownloader(MDApp):
             
             self.root.ids.main_fetch.disabled = False
 
-        except : self.root.ids.main_fetch.disabled = False
+        except Exception as e : 
+            self.root.ids.main_fetch.disabled = False
+            print(f"ERROR in start_download: {e}")
 
     
     def close_d(self,obj):
